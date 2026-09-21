@@ -121,4 +121,5 @@ src/test/java/com/randomsurprise/config/
 - 可自由使用、修改、再分发，包括商业用途，只需保留版权与许可声明
 - 本仓库不附带、不分发任何第三方模组，第三方模组版权归其原作者所有
 - 开发期引用的 Jade / ToroHealth jar 仅作 `compileOnly` 依赖，已排除在仓库与产物之外
+- 第三方组件与构建工具链的完整说明见 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)
 - Minecraft Forge 的 LGPL 2.1 许可与致谢文本见 `docs/forge/`
