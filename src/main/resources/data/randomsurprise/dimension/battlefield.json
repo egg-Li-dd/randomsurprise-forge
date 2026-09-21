@@ -1,0 +1,13 @@
+{
+  "type": "randomsurprise:battlefield",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "format": 3,
+      "layers": [],
+      "biome": "minecraft:plains",
+      "features": [],
+      "structure_overrides": []
+    }
+  }
+}

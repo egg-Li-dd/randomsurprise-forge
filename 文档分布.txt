@@ -1,0 +1,178 @@
+========================================
+randomsurprise-forge-new 文档分布（文件功能位置索引）
+========================================
+本文件用于快速定位各功能模块对应的源码文件，供后续相关任务参考。
+最后更新：钱袋子物品 + 商店预附魔装备 + 附魔书拖拽应用 + 十连抽界面优化 + 词条效果增强 + 词条注册表/客户端数据性能优化(HashMap索引+缓存)
++ v13: 新增36个词条（16个好词条机制型+20个坏词条机制型），好词条在所有场景生效，坏词条仅在征召世界生效
++ 客户端性能优化（TimerHud/SuperPowerHud Component缓存、反射Field缓存、右键救助搜索优化）
++ 超能力系统漏洞修复（11项：递归防护/飞行续期/断线重连/材料复制/雷霆闪电/pending_roll递减/跨维度传送/瞬移安全/无效ID/PositionRecord维度/removeSuperPower）
++ B1: 属性面板（P键打开 AttributePanelScreen，显示原版属性+词条专属属性）
+
+----------------------------------------
+一、模组核心
+----------------------------------------
+src/main/java/com/randomsurprise/RandomSurpriseMod.java
+  - 主模组类（@Mod），构造函数中注册事件、网络、第三方兼容。
+  - 调用 CompatRegistry.register(modEventBus) 注册可选兼容。
+  - v13: onLivingDeath/onLivingHurt/onServerTick 中新增 PlayerAffixManager + HostileEnhancer 词条机制调用。
+
+----------------------------------------
+二、词条系统
+----------------------------------------
+src/main/java/com/randomsurprise/affix/Affix.java
+  - 词条数据结构（稀有度、好坏、各类加成、v2~v11 字段、兼容构造器）。
+  - v11 包含：naturalRegenBonus, lightningPercentDamage, frostFreezeChance, firePercentDamagePerSecond
+src/main/java/com/randomsurprise/affix/AffixRarity.java
+  - 词条稀有度枚举：getColor() 颜色、getDisplayName() 名称。
+src/main/java/com/randomsurprise/affix/AffixRegistry.java
+  - 词条注册表 / 抽奖券等。包含所有词条定义（好坏词条各稀有度）。
+  - v13: 新增36个词条（16个好词条机制型 + 20个坏词条机制型），使用v12完整构造器注册。
+  - 金词条闪电：lightningPercentDamage=0.05（5%最大生命伤害）
+  - 冰霜词条：frostFreezeChance（概率冰冻敌人）
+  - 火焰词条：firePercentDamagePerSecond=0.02（每秒2%最大生命伤害）
+  - 性能：ID_MAP(HashMap) 供 getById O(1) 查找；RARITY_CACHE 预建 (good_rarity)
+    分组不可变列表供 getByRarity O(1) 返回；register 时同步写入两索引，
+    static block 末尾用 replaceAll+unmodifiableList 冻结稀有度缓存。
+src/main/java/com/randomsurprise/affix/PlayerAffixManager.java
+  - 玩家词条管理（含冰冻判定、战场、铁傀儡保护等）。
+  - v13: 新增16个好词条机制型效果，通过affix ID检查触发：
+    onEntityDamaged: 痛楚循环/虚空侵蚀/震波/旋风斩/暗杀/动能蓄势/破甲/削弱/额外射击/连锁束缚/灵魂虹吸暴击
+    onLivingHurt: 复仇反弹30%/守卫击杀减伤50%
+    onLivingDeath: 死亡引爆/守卫护盾/药剂渴望清除负面/灵魂虹吸获层
+    onServerTick: 净化光环每10秒清除负面效果/守卫护盾tick递减
+    isAnyPlayerHasAffix(): 全局词条检查（供HostileEnhancer使用）
+src/main/java/com/randomsurprise/affix/HostileEnhancer.java
+  - 敌对生物增强器（在实体生成时增强属性）。
+  - v13: 新增20个坏词条机制型效果，仅在征召世界生效：
+    onLivingDeath: 死亡爆炸/死亡分裂/尸体连锁/1UP复活
+    onLivingHurt: 濒死狂暴/末影闪现/击退炮/燃烧光环/凋零之触/锈蚀攻击/蛛网陷阱/仇恨连锁
+    onServerTick: 狂暴计时/再生怪物/隐身/雷暴召唤/火球射手/治疗友军/护盾充能/黑暗光环
+src/main/java/com/randomsurprise/client/ClientAffixData.java
+  - 客户端词条数据：getOwnAffixes()/getOwnGoodAffixes()/getOwnBadAffixes() 返回本地玩家词条 List<Affix>。
+  - 性能：update() 时重建 cachedOwnAffixes/cachedGoodAffixes/cachedBadAffixes 三个不可变缓存列表，
+    get 方法直接返回缓存，避免 AffixStatsPanel/ToroHealthCompat/JadePlugin 每帧创建列表与注册表查找。
+src/main/java/com/randomsurprise/superpower/SuperPowerHandler.java
+  - 超能力服务端核心逻辑，含 EXCLUSIVE_GROUPS 附魔互斥检查。
+  - 漏洞修复：weaponMasterProcessing 递归防护(try-finally)、飞行重复触发检查(fly_already_active)、
+    onPlayerJoin 清除断线重连残留飞行能力、doDecompose 消耗等量物品防复制(outputCount)、
+    setVisualOnly(true) 防雷霆双重伤害、pendingRollTimers 独立计数器防双重递减、
+    doNearDeathRecall 跨维度检查(dimension)、doBlink 方块/实体传送空气安全检查、
+    onPlayerJoin 无效超能力ID验证(removeSuperPower重新抽取)。
+src/main/java/com/randomsurprise/superpower/PlayerSuperPowerManager.java
+  - 玩家超能力数据管理（JSON持久化、冷却、状态、位置历史、二段跳）。
+  - 漏洞修复：PositionRecord 添加 dimension 字段防止跨维度传送、
+    recordPosition 传入 player.level().dimension()、新增 removeSuperPower() 方法清除无效ID。
+
+----------------------------------------
+三、客户端 HUD 与界面
+----------------------------------------
+src/main/java/com/randomsurprise/client/TimerHud.java        - 倒计时 HUD（update()缓存cachedTextWidth，避免每帧font.width计算）
+src/main/java/com/randomsurprise/client/SuperPowerHud.java   - 超能力 HUD（缓存cachedName/cachedSp，仅在能力切换时重建Component）
+src/main/java/com/randomsurprise/client/AffixListScreen.java - 词条列表界面（R键打开）
+src/main/java/com/randomsurprise/client/AttributePanelScreen.java - 属性面板界面（P键打开，显示原版属性+词条专属属性汇总）
+src/main/java/com/randomsurprise/client/AffixStatsPanel.java - 背包界面词条属性汇总面板（可滚动）
+src/main/java/com/randomsurprise/client/LotteryTenScreen.java - 十连抽结果界面（已优化显示）
+src/main/java/com/randomsurprise/client/MoneyBagScreen.java  - 钱袋子UI界面（存取金币）
+src/main/java/com/randomsurprise/client/ShopScreen.java      - 商店界面
+src/main/java/com/randomsurprise/client/ClientRandomSurpriseMod.java
+  - 客户端入口：按键监听（R/P/G/V键）、背包商店按钮、词条面板渲染、面板滚动、
+    附魔书拖到物品上直接应用（ScreenEvent.MouseButtonPressed.Pre + 缓存反射Field获取hoveredSlot）。
+  - 性能优化：hoveredSlotField静态缓存避免每次点击反射查找；
+    handleReviveRightClick仅在右键按下/松开时才搜索倒地队友（避免每tick遍历实体）。
+
+----------------------------------------
+四、钱袋子物品系统
+----------------------------------------
+src/main/java/com/randomsurprise/affix/MoneyBagItem.java
+  - 钱袋子物品：NBT存储金币（key: "coin_value"），右键打开UI，Shift+右键快速存入。
+  - 附魔光泽（有金币时）、耐久条显示（每1000金币满条，金色）、不可附魔、不可堆叠。
+src/main/java/com/randomsurprise/client/MoneyBagScreen.java
+  - 钱袋子UI：显示存储金币/背包金币数量，输入框+存入/取出/全部存入/全部取出按钮。
+src/main/java/com/randomsurprise/network/MoneyBagPayload.java
+  - C2S数据包：处理存入/取出/全部存入/全部取出操作，服务端验证并修改NBT和背包。
+src/main/java/com/randomsurprise/affix/ModItems.java
+  - MONEY_BAG 注册：Rarity.RARE, stacksTo(1)。
+src/main/resources/assets/randomsurprise/models/item/money_bag.json - 物品模型
+src/main/resources/assets/randomsurprise/textures/item/money_bag.png - 16x16像素纹理
+src/main/resources/data/randomsurprise/recipes/money_bag.json
+  - 合成配方：线+皮革+金锭 → 钱袋子（Shaped: S S / LGL / LLL）
+
+----------------------------------------
+五、商店系统
+----------------------------------------
+src/main/java/com/randomsurprise/shop/ShopManager.java
+  - 商店分类管理：金币兑换、模组物品、强力附魔书、稀有物品、武器装备、
+    预附魔装备、消耗品、资源兑换、模组装备、稀有回收。
+  - 预附魔装备：10件钻石装备（剑/镐/斧/弓/弩/盾/头盔/胸甲/护腿/靴子），
+    每件附带3-5个附魔，避免互斥附魔组合。
+src/main/java/com/randomsurprise/shop/ShopEntry.java
+  - 商店条目数据结构：支持 itemIdString（模组物品动态解析）和 enchantments（附魔格式 minecraft:sharpness|5）。
+src/main/java/com/randomsurprise/shop/ExchangeRegistry.java
+  - 资源兑换注册表。
+
+----------------------------------------
+六、附魔书拖拽应用系统
+----------------------------------------
+src/main/java/com/randomsurprise/network/EnchantedBookApplyPayload.java
+  - C2S数据包：玩家在背包界面将附魔书拖到物品上时触发。
+  - 读取附魔书的 StoredEnchantments NBT，检查与目标物品现有附魔的兼容性（互斥检查）。
+  - 通过 EnchantmentHelper.setEnchantments() 应用附魔，消耗1本附魔书。
+  - 包含 EXCLUSIVE_GROUPS 互斥附魔组（与 SuperPowerHandler 一致）。
+src/main/java/com/randomsurprise/client/ClientRandomSurpriseMod.java
+  - onScreenMouseClicked: 监听 ScreenEvent.MouseButtonPressed.Pre，
+    检测光标持有附魔书+左键点击可附魔物品，通过缓存反射Field获取 hoveredSlot，取消原版交换并发送数据包。
+
+----------------------------------------
+七、第三方模组兼容
+----------------------------------------
+src/main/java/com/randomsurprise/compat/CompatRegistry.java
+  - 兼容性注册器：检测 jade / torohealth 是否加载并按需注册集成。
+src/main/java/com/randomsurprise/compat/jade/JadePlugin.java
+  - Jade 集成：@WailaPlugin 自动发现，注册 AffixEntityProvider，
+    看向活体实体时在悬浮框追加本地玩家词条摘要（前3个，按稀有度着色）。
+src/main/java/com/randomsurprise/compat/torohealth/ToroHealthCompat.java
+  - ToroHealth 集成：独立 GUI 覆盖层，在屏幕左上角血条下方显示
+    本地玩家词条数量与稀有度分布。
+
+----------------------------------------
+八、网络通信
+----------------------------------------
+src/main/java/com/randomsurprise/network/ModNetworking.java
+  - SimpleChannel 注册所有 C2S/S2C 数据包：
+    C2S: LotteryRequest, ShopPurchase, SuperPowerAction, SuperPowerToggle,
+         ReviveAction, Exchange, MoneyBag, EnchantedBookApply
+    S2C: LotteryResult, LotteryTenResult, AffixSync, TimerSync, ShopPurchaseResult,
+         SuperPowerRoll, SuperPowerSync, BattlefieldMobCount
+
+----------------------------------------
+九、依赖与元数据
+----------------------------------------
+build.gradle
+  - repositories.flatDir libs/；compileOnly fg.deobf("blank:jade:1.20.1")、
+    compileOnly fg.deobf("blank:torohealth:1.20.1")。
+  - accessTransformer 配置在 src/main/resources/META-INF/accesstransformer.cfg
+libs/jade-1.20.1.jar          - Jade 模组 jar（编译期依赖）
+libs/torohealth-1.20.1.jar    - ToroHealth 模组 jar（编译期依赖）
+src/main/resources/META-INF/mods.toml
+  - 已添加 jade、torohealth 可选依赖（mandatory=false，side=CLIENT）。
+src/main/resources/META-INF/accesstransformer.cfg
+  - 访问转换器：Entity.onGround, AbstractContainerScreen.hoveredSlot（注：hoveredSlot 通过反射访问）
+src/main/resources/assets/randomsurprise/lang/zh_cn.json
+  - 全部翻译键：模组描述、事件消息、词条名称/描述、抽奖、商店、钱袋子、附魔书应用、兼容等。
+
+----------------------------------------
+十、建筑生成系统
+----------------------------------------
+src/main/java/com/randomsurprise/BuildingGenerator.java
+  - 随机建筑生成器，4种建筑类型：TRAP(陷阱洞穴5种陷阱)/REWARD_HOUSE(奖励小屋3箱子)/
+    BATTLE_TOWER(战斗高塔，塔高随机15-24，含刷怪笼/楼层箱子/凋零骷髅Boss)/
+    MOD_STRUCTURE(读取schematics目录下.nbt文件放置建筑)。
+  - 关键方法：
+    generateBuilding(): 入口方法，含try-catch异常保护(Bug 9)，随机选位置+方向+信标。
+    spawnAirdropBeacon(): 空投信标(箱子旁)，清空上方200格至天空(Bug 1)。
+    spawnBeacon(): 建筑信标，清空上方200格至天空(Bug 2)，信标偏移=实际塔高+2(Bug 3)。
+    generateBattleTower(): 返回int塔高，信标偏移动态计算(Bug 3)。
+    generateBattleTower梯子: 朝向塔中心方向(Bug 4, FACING按ladderSideX/Z计算)。
+    placeSchematic(): 读取nbt方块+metadata方向(Bug 5, FACING属性)，byId判AIR(Bug 6)，
+      Y边界检查(Bug 7, getMinBuildHeight/getMaxBuildHeight)。
+    findSuitableY(): 使用heightmap找固体地表。
