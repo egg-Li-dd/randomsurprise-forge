@@ -5,7 +5,7 @@
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-3C8527?style=flat-square)](#)
 [![Forge](https://img.shields.io/badge/Forge-47.3.33-E04E14?style=flat-square)](#)
 [![Java](https://img.shields.io/badge/Java-17-007396?style=flat-square)](#)
-[![License](https://img.shields.io/badge/License-All_Rights_Reserved-inactive?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 ---
 
@@ -116,8 +116,9 @@ src/test/java/com/randomsurprise/config/
 
 ## 📄 许可
 
-**All Rights Reserved**（保留所有权利）— 详见 [LICENSE](LICENSE)。
+**MIT License**（开源）— 详见 [LICENSE](LICENSE)。
 
-- 本仓库不附带、不分发任何第三方模组
+- 可自由使用、修改、再分发，包括商业用途，只需保留版权与许可声明
+- 本仓库不附带、不分发任何第三方模组，第三方模组版权归其原作者所有
 - 开发期引用的 Jade / ToroHealth jar 仅作 `compileOnly` 依赖，已排除在仓库与产物之外
 - Minecraft Forge 的 LGPL 2.1 许可与致谢文本见 `docs/forge/`
